@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tap & Earn</title>
+  <script src='//whephiwums.com/sdk.js' data-zone='9324910' data-sdk='show_9324910'></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: black;
+      color: white;
+    }
+    .balance-bar {
+      background: #0044cc;
+      padding: 15px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      position: fixed;
+      width: 100%;
+      top: 0;
+      z-index: 1000;
+    }
+    .container {
+      padding-top: 70px;
+      text-align: center;
+    }
+    .tap-btn {
+      margin: 30px auto;
+      background: #007bff;
+      color: white;
+      width: 120px;
+      height: 120px;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 60px;
+      border: none;
+      cursor: pointer;
+    }
+    .withdraw-section {
+      background: white;
+      color: black;
+      padding: 20px;
+      margin: 30px;
+      border-radius: 10px;
+    }
+    input {
+      padding: 10px;
+      width: 90%;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .history {
+      margin: 20px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+<div class="balance-bar">Balance: <span id="balance">0</span> COINS</div>
+
+<div class="container">
+  <button class="tap-btn" onclick="watchAd()">TAP ME</button>
+</div>
+
+<div class="withdraw-section">
+  <h3>Withdraw Coins</h3>
+  <input type="text" id="bank" placeholder="Bank" required><br>
+  <input type="text" id="accNumber" placeholder="Account Number" required><br>
+  <input type="text" id="accName" placeholder="Account Name" required><br>
+  <input type="number" id="amount" placeholder="Amount (min: 200000)" required><br>
+  <button onclick="submitWithdrawal()">Withdraw</button>
+</div>
+
+<div class="history">
+  <h3>Your Last 10 Withdrawals</h3>
+  <div id="withdrawalHistory"></div>
+</div>
+
+<script>
+  let balance = parseInt(localStorage.getItem('tapBalance')) || 0;
+  document.getElementById('balance').textContent = balance.toLocaleString();
+
+  function updateBalanceDisplay() {
+    document.getElementById('balance').textContent = balance.toLocaleString();
+    localStorage.setItem('tapBalance', balance);
+  }
+
+  function watchAd() {
+    show_9324910().then(() => {
+      alert('You have seen an ad!');
+      balance += 200;
+      updateBalanceDisplay();
+    });
+  }
+
+  function submitWithdrawal() {
+    const bank = document.getElementById('bank').value.trim();
+    const accNumber = document.getElementById('accNumber').value.trim();
+    const accName = document.getElementById('accName').value.trim();
+    const amount = parseInt(document.getElementById('amount').value.trim());
+
+    if (!bank || !accNumber || !accName || isNaN(amount)) {
+      alert("Please fill in all fields correctly.");
+      return;
+    }
+
+    if (amount < 200000) {
+      alert("Minimum withdrawal is 200,000 COINS.");
+      return;
+    }
+
+    if (amount > balance) {
+      alert("Insufficient balance.");
+      return;
+    }
+
+    const now = new Date();
+    const timeStr = now.toLocaleString();
+
+    const data = {
+      Bank: bank,
+      "Account Number": accNumber,
+      "Account Name": accName,
+      Amount: amount,
+      Status: "Pending",
+      Time: timeStr
+    };
+
+    // Send to SheetDB
+    fetch('https://sheetdb.io/api/v1/7bfkldaha6bz8', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: data })
+    }).then(res => {
+      if (res.ok) {
+        balance -= amount;
+        updateBalanceDisplay();
+        alert("Withdrawal request sent!");
+
+        saveToLocalHistory(data);
+        loadWithdrawalHistory();
+        document.getElementById('bank').value = "";
+        document.getElementById('accNumber').value = "";
+        document.getElementById('accName').value = "";
+        document.getElementById('amount').value = "";
+      } else {
+        alert("Error submitting withdrawal.");
+      }
+    });
+  }
+
+  function saveToLocalHistory(entry) {
+    let history = JSON.parse(localStorage.getItem("withdrawals")) || [];
+    history.unshift(entry);
+    if (history.length > 10) history = history.slice(0, 10);
+    localStorage.setItem("withdrawals", JSON.stringify(history));
+  }
+
+  function loadWithdrawalHistory() {
+    const historyDiv = document.getElementById("withdrawalHistory");
+    let history = JSON.parse(localStorage.getItem("withdrawals")) || [];
+    historyDiv.innerHTML = history.map(h => `
+      <div style="margin-bottom: 10px;">
+        <strong>Bank:</strong> ${h.Bank}<br>
+        <strong>Account Number:</strong> ${h["Account Number"]}<br>
+        <strong>Account Name:</strong> ${h["Account Name"]}<br>
+        <strong>Amount:</strong> ${parseInt(h.Amount).toLocaleString()} COINS<br>
+        <strong>Time:</strong> ${h.Time}
+      </div>
+    `).join('');
+  }
+
+  // Initial load
+  loadWithdrawalHistory();
+</script>
+
+</body>
+  </html>
